@@ -135,10 +135,35 @@ class Scene:
     def __init__(self, name: str):
         self.name = name
         self.objects: list[ObjectType] = []
+        self.camera_index = -1
 
     def register_object(self, add_object: ObjectType):
         self.objects.append(add_object)
         return len(self.objects) - 1
+
+    def set_camera_by_index(self, index: int):
+        if isinstance(self.objects[index], Camera):
+            self.camera_index = index
+        else:
+            raise TypeError("Selected object is not a Camera.")
+
+    def get_camera(self):
+        if self.camera_index != -1:
+            return self.objects[self.camera_index]
+        return None
+
+    def update(self, dt: float):
+        for obj in self.objects:
+            obj.update(dt)
+
+    def draw_objects(self, screen: pygame.Surface):
+        if self.camera_index != -1:
+            camera = self.objects[self.camera_index]
+            for obj in sorted(self.objects, key=lambda o: o.z_index):
+                if isinstance(obj, SpriteObject):
+                    pos = camera.real_pos_to_render_pos(obj.get_pivot_pos())
+                    obj.sprite.draw(screen, pos)
+
 
 class Game:
     def __init__(self, screen_size=(800, 600)):
@@ -149,7 +174,6 @@ class Game:
         self.clock = pygame.time.Clock()
         self.event_handler = None
         self.loop_func = None
-        self.camera_index = -1
         self.is_running = False
 
     def add_scene(self, scene: Scene):
@@ -160,7 +184,6 @@ class Game:
     def set_scene(self, scene_name: str):
         if scene_name in self.scenes:
             self.current_scene_name = scene_name
-            self.camera_index = -1
         else:
             raise ValueError(f"Scene '{scene_name}' not found.")
 
@@ -170,24 +193,8 @@ class Game:
     def set_loop_func(self, func):
         self.loop_func = func
 
-    def set_camera_by_index(self, index: int):
-        current_scene = self.get_current_scene()
-        if isinstance(current_scene.objects[index], Camera):
-            self.camera_index = index
-        else:
-            raise TypeError("Selected object is not a Camera.")
-
     def get_current_scene(self) -> Scene:
         return self.scenes[self.current_scene_name]
-
-    def draw_objects(self):
-        scene = self.get_current_scene()
-        if self.camera_index != -1:
-            camera = scene.objects[self.camera_index]
-            for obj in sorted(scene.objects, key=lambda o: o.z_index):
-                if isinstance(obj, SpriteObject):
-                    pos = camera.real_pos_to_render_pos(obj.get_pivot_pos())
-                    obj.sprite.draw(self.screen, pos)
 
     def run(self):
         self.is_running = True
@@ -199,9 +206,9 @@ class Game:
 
             dt = self.clock.tick(60) / 1000.0
 
-            # 업데이트
-            for obj in self.get_current_scene().objects:
-                obj.update(dt)
+            # 현재 씬 업데이트
+            current_scene = self.get_current_scene()
+            current_scene.update(dt)
 
             # 사용자 정의 루프 함수
             if self.loop_func:
@@ -209,5 +216,5 @@ class Game:
 
             # 렌더링
             self.screen.fill((0, 0, 0))
-            self.draw_objects()
+            current_scene.draw_objects(self.screen)
             pygame.display.flip()
