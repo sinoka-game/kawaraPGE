@@ -232,6 +232,8 @@ class Game:
             # 이벤트 처리
             if self.event_handler:
                 for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        self.is_running = False
                     self.event_handler(event)
 
             dt = self.clock.tick(60) / 1000.0
