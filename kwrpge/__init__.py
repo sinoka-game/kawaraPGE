@@ -202,10 +202,10 @@ class Game:
         else:
             raise ValueError(f"Scene at index '{scene_index}' not found.")
     
-    def set_scene_by_name(self, scene_name: str):
-        # 이름으로 씬을 찾고 설정
+    # 씬 이름으로 인덱스 찾기
+    def get_scene_index_by_name(self, scene_name: str) -> int:
         if scene_name in self.scene_names:
-            self.current_scene_index = self.scene_names[scene_name]
+            return self.scene_names[scene_name]
         else:
             raise ValueError(f"Scene with name '{scene_name}' not found.")
     
