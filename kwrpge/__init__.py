@@ -17,6 +17,8 @@ import pygame
 from typing import List
 from enum import Enum, auto
 
+from log4py.log4py import Logger
+
 class Pivot(Enum):
     TOP_LEFT = auto()
     TOP = auto()
@@ -139,6 +141,9 @@ class Scene:
 
     def register_object(self, add_object: ObjectType):
         self.objects.append(add_object)
+        if isinstance(add_object, Camera):
+            self.set_camera_by_index(len(self.objects) - 1)
+            
         return len(self.objects) - 1
 
     def set_camera_by_index(self, index: int):
@@ -178,6 +183,7 @@ class Scene:
 
 class Game:
     def __init__(self, screen_size=(800, 600)):
+        self.logger = Logger()
         pygame.init()
         self.scenes: list[Scene] = []
         self.scene_names: dict[str, int] = {}  # 씬 이름과 인덱스를 매핑하는 딕셔너리

@@ -1,0 +1,3 @@
+[submodule "log4py"]
+	path = log4py
+	url = https://github.com/newkincode/log4py.git
