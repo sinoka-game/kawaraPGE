@@ -1,4 +1,4 @@
-# ---[ KawaraPGE v1.0 ]---
+# ---[ KawaraPGE v1.1 ]---
 # Kanowara Python Game Engine
 # Copyright (c) 2025, Sinoka Games. All rights reserved.
 # Created by Kanowara Sinoka (Kim Taeyang)
@@ -164,12 +164,24 @@ class Scene:
                     pos = camera.real_pos_to_render_pos(obj.get_pivot_pos())
                     obj.sprite.draw(screen, pos)
 
+    # 씬 내에서 오브젝트의 이름으로 찾기
+    def get_object_by_name(self, name: str):
+        for obj in self.objects:
+            if hasattr(obj, 'name') and obj.name == name:
+                return obj
+        return None
+
+    # 씬 내에서 오브젝트의 타입으로 찾기
+    def get_objects_by_type(self, obj_type: type):
+        return [obj for obj in self.objects if isinstance(obj, obj_type)]
+
 
 class Game:
     def __init__(self, screen_size=(800, 600)):
         pygame.init()
-        self.scenes: dict[str, Scene] = {}
-        self.current_scene_name: str | None = None
+        self.scenes: list[Scene] = []
+        self.scene_names: dict[str, int] = {}  # 씬 이름과 인덱스를 매핑하는 딕셔너리
+        self.current_scene_index: int | None = None  # 현재 씬의 인덱스
         self.screen = pygame.display.set_mode(screen_size)
         self.clock = pygame.time.Clock()
         self.event_handler = None
@@ -177,24 +189,36 @@ class Game:
         self.is_running = False
 
     def add_scene(self, scene: Scene):
-        self.scenes[scene.name] = scene
-        if self.current_scene_name is None:
-            self.current_scene_name = scene.name
+        # 씬을 리스트에 추가하고 이름-인덱스를 매핑
+        self.scenes.append(scene)
+        self.scene_names[scene.name] = len(self.scenes) - 1
+        if self.current_scene_index is None:
+            # 첫 번째 씬을 현재 씬으로 설정
+            self.current_scene_index = len(self.scenes) - 1
 
-    def set_scene(self, scene_name: str):
-        if scene_name in self.scenes:
-            self.current_scene_name = scene_name
+    def set_scene(self, scene_index: int):
+        if 0 <= scene_index < len(self.scenes):
+            self.current_scene_index = scene_index
         else:
-            raise ValueError(f"Scene '{scene_name}' not found.")
+            raise ValueError(f"Scene at index '{scene_index}' not found.")
+    
+    def set_scene_by_name(self, scene_name: str):
+        # 이름으로 씬을 찾고 설정
+        if scene_name in self.scene_names:
+            self.current_scene_index = self.scene_names[scene_name]
+        else:
+            raise ValueError(f"Scene with name '{scene_name}' not found.")
+    
+    def get_current_scene(self) -> Scene:
+        if self.current_scene_index is not None:
+            return self.scenes[self.current_scene_index]
+        raise ValueError("No current scene set.")
 
     def set_event_handler(self, handler):
         self.event_handler = handler
 
     def set_loop_func(self, func):
         self.loop_func = func
-
-    def get_current_scene(self) -> Scene:
-        return self.scenes[self.current_scene_name]
 
     def run(self):
         self.is_running = True
