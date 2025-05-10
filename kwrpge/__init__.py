@@ -17,7 +17,7 @@ import pygame
 from typing import List
 from enum import Enum, auto
 
-from log4py.log4py import Logger
+from ..log4py.log4py import Logger
 
 class Pivot(Enum):
     TOP_LEFT = auto()
@@ -248,3 +248,4 @@ class Game:
             self.screen.fill((0, 0, 0))
             current_scene.draw_objects(self.screen)
             pygame.display.flip()
+        pygame.quit()
