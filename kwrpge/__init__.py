@@ -1,4 +1,4 @@
-# ---[ KawaraPGE v1.1 ]---
+# ---[ KawaraPGE v1.2 ]---
 # Kanowara Python Game Engine
 # Copyright (c) 2025, Sinoka Games. All rights reserved.
 # Created by Kanowara Sinoka (Kim Taeyang)
@@ -9,7 +9,7 @@
 # To use this engine, place the "kwrpge" folder in your project directory,
 # and import it with the following command:
 # 
-# import kwrpge
+# from kawaraPGE import kwrpge
 #
 # --- [ All Code ] ---
 
@@ -18,6 +18,12 @@ from typing import List
 from enum import Enum, auto
 
 from ..log4py.log4py import Logger
+
+CIRCLE = 100
+RECTANGLE = 101
+TRIANGLE = 102
+
+COLOR_BLACK = pygame.Color(0,0,0)
 
 class Pivot(Enum):
     TOP_LEFT = auto()
@@ -30,6 +36,11 @@ class Pivot(Enum):
     BOTTOM = auto()
     BOTTOM_RIGHT = auto()
 
+# OBJ Copy
+# 카와라PGE의 오브젝트 복제 시스템.
+# pos는 기본 위치 리스트이며, 각 위치를 기준으로 objcopy_pos에 지정된 상대 오프셋만큼 복제됩니다.
+# 모든 그려지는 위치는 공통된 pivot 기준으로 보정되어 렌더링됩니다.
+
 class ObjectType:
     def __init__(
         self,
@@ -37,13 +48,15 @@ class ObjectType:
         name: str,
         pivot: Pivot = Pivot.TOP_LEFT,
         size: pygame.Vector2 = pygame.Vector2(32, 32),
-        z_index: int = 0
+        z_index: int = 0,
+        objcopy_pos: List[pygame.Vector2] = None  # 오브젝트 복제 위치 리스트
     ):
         self.pos = pos
         self.name = name
         self.pivot = pivot
         self.size = size
         self.z_index = z_index
+        self.objcopy_pos = objcopy_pos or []  # 빈 리스트로 초기화 (복제 없음)
 
     def get_pivot_offset(self) -> pygame.Vector2:
         center_x = self.size.x / 2
@@ -74,9 +87,46 @@ class ObjectType:
 
     def get_pivot_pos(self):
         return self.pos - self.get_pivot_offset()
+        
+    def get_all_positions(self) -> List[pygame.Vector2]:
+        """
+        기본 위치와 복제 위치(기본 위치 + 상대 오프셋)의 리스트를 반환합니다.
+        """
+        positions = [self.pos]  # 기본 위치 포함
+        
+        # 복제된 모든 위치 추가
+        for offset in self.objcopy_pos:
+            positions.append(self.pos + offset)
+            
+        return positions
+        
+    def get_all_pivot_positions(self) -> List[pygame.Vector2]:
+        """
+        모든 위치(기본 위치 및 복제 위치)에 대한 pivot 보정된 위치 목록을 반환합니다.
+        """
+        pivot_offset = self.get_pivot_offset()
+        return [pos - pivot_offset for pos in self.get_all_positions()]
 
     def update(self, dt: float):
         pass  # 기본 동작 없음
+        
+    def add_copy_position(self, offset: pygame.Vector2):
+        """
+        복제 위치 추가하기
+        """
+        self.objcopy_pos.append(offset)
+        
+    def set_copy_positions(self, offsets: List[pygame.Vector2]):
+        """
+        복제 위치 목록 설정하기
+        """
+        self.objcopy_pos = offsets.copy()  # 목록 복사하여 할당
+        
+    def clear_copy_positions(self):
+        """
+        모든 복제 위치 제거하기
+        """
+        self.objcopy_pos.clear()
 
 class Sprite:
     def __init__(self, image: pygame.Surface):
@@ -86,7 +136,7 @@ class Sprite:
         screen.blit(self.image, pos)
 
 class ShapeSprite(Sprite):
-    def __init__(self, shape_type: str, color: pygame.Color, size: pygame.Vector2, thickness: int = 0):
+    def __init__(self, shape_type: int, color: pygame.Color, size: pygame.Vector2, thickness: int = 0):
         """
         Create a shape-based sprite.
 
@@ -106,13 +156,13 @@ class ShapeSprite(Sprite):
 
     def _draw_shape(self):
         """Draw the selected shape onto the surface."""
-        if self.shape_type == 'circle':
+        if self.shape_type == 100:
             # Draw a circle (size.x is radius)
             pygame.draw.circle(self.image, self.color, (self.size.x // 2, self.size.y // 2), self.size.x // 2, self.thickness)
-        elif self.shape_type == 'rectangle':
+        elif self.shape_type == 101:
             # Draw a rectangle (size.x is width, size.y is height)
             pygame.draw.rect(self.image, self.color, pygame.Rect(0, 0, self.size.x, self.size.y), self.thickness)
-        elif self.shape_type == 'triangle':
+        elif self.shape_type == 102:
             # Draw a triangle (equilateral, centered)
             points = [(self.size.x // 2, 0), (0, self.size.y), (self.size.x, self.size.y)]
             pygame.draw.polygon(self.image, self.color, points, self.thickness)
@@ -122,12 +172,14 @@ class ShapeSprite(Sprite):
         super().draw(screen, pos)
 
 class SpriteObject(ObjectType):
-    def __init__(self, pos: pygame.Vector2, sprite: Sprite, name: str = "Sprite", pivot: Pivot = Pivot.TOP_LEFT, size: pygame.Vector2 = pygame.Vector2(32, 32)):
-        super().__init__(pos, name, pivot, size)
+    def __init__(self, pos: pygame.Vector2, sprite: Sprite, name: str = "Sprite", pivot: Pivot = Pivot.TOP_LEFT, 
+                 size: pygame.Vector2 = pygame.Vector2(32, 32), objcopy_pos: List[pygame.Vector2] = None):
+        super().__init__(pos, name, pivot, size, 0, objcopy_pos)
         self.sprite = sprite
 
 class Camera(ObjectType):
-    def __init__(self, pos: pygame.Vector2 = pygame.Vector2(0, 0), name: str = "Camera", pivot: Pivot = Pivot.TOP_LEFT, size: pygame.Vector2 = pygame.Vector2(800, 600)):
+    def __init__(self, pos: pygame.Vector2 = pygame.Vector2(0, 0), name: str = "Camera", pivot: Pivot = Pivot.TOP_LEFT, 
+                 size: pygame.Vector2 = pygame.Vector2(800, 600)):
         super().__init__(pos, name, pivot, size)
 
     def real_pos_to_render_pos(self, real_pos: pygame.Vector2):
@@ -166,8 +218,10 @@ class Scene:
             camera = self.objects[self.camera_index]
             for obj in sorted(self.objects, key=lambda o: o.z_index):
                 if isinstance(obj, SpriteObject):
-                    pos = camera.real_pos_to_render_pos(obj.get_pivot_pos())
-                    obj.sprite.draw(screen, pos)
+                    # 기본 위치와 모든 복제 위치에 대해 그리기
+                    for pos in obj.get_all_pivot_positions():
+                        render_pos = camera.real_pos_to_render_pos(pos)
+                        obj.sprite.draw(screen, render_pos)
 
     # 씬 내에서 오브젝트의 이름으로 찾기
     def get_object_by_name(self, name: str):
