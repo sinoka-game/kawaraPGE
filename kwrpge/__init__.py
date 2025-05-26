@@ -1,4 +1,4 @@
-# ---[ KawaraPGE v1.2 ]---
+# ---[ KawaraPGE v1.3.1 ]---
 # Kanowara Python Game Engine
 # Copyright (c) 2025, Sinoka Games. All rights reserved.
 # Created by Kanowara Sinoka (Kim Taeyang)
@@ -17,13 +17,22 @@ import pygame
 from typing import List
 from enum import Enum, auto
 
+import pygame.gfxdraw
+from . import util
+from .util import radius_to_vector2
+
 from ..log4py.log4py import Logger
 
 CIRCLE = 100
 RECTANGLE = 101
 TRIANGLE = 102
 
+ANTI_CIRCLE = 200
+ANTI_RECTANGLE = 201
+ANTI_TRIANGLE = 202
+
 COLOR_BLACK = pygame.Color(0,0,0)
+COLOR_WHITE = pygame.Color(255,255,255)
 
 class Pivot(Enum):
     TOP_LEFT = auto()
@@ -87,25 +96,6 @@ class ObjectType:
 
     def get_pivot_pos(self):
         return self.pos - self.get_pivot_offset()
-        
-    def get_all_positions(self) -> List[pygame.Vector2]:
-        """
-        기본 위치와 복제 위치(기본 위치 + 상대 오프셋)의 리스트를 반환합니다.
-        """
-        positions = [self.pos]  # 기본 위치 포함
-        
-        # 복제된 모든 위치 추가
-        for offset in self.objcopy_pos:
-            positions.append(self.pos + offset)
-            
-        return positions
-        
-    def get_all_pivot_positions(self) -> List[pygame.Vector2]:
-        """
-        모든 위치(기본 위치 및 복제 위치)에 대한 pivot 보정된 위치 목록을 반환합니다.
-        """
-        pivot_offset = self.get_pivot_offset()
-        return [pos - pivot_offset for pos in self.get_all_positions()]
 
     def update(self, dt: float):
         pass  # 기본 동작 없음
@@ -127,6 +117,30 @@ class ObjectType:
         모든 복제 위치 제거하기
         """
         self.objcopy_pos.clear()
+    
+    def draw_pivot(self, screen: pygame.Surface, camera=None, color: pygame.Color = pygame.Color(255, 0, 0), size: int = 5):
+        """
+        오브젝트의 피벗 포인트를 시각적으로 표시합니다.
+        
+        :param screen: 그릴 화면 (pygame.Surface)
+        :param camera: 카메라 객체 (None이면 카메라 변환 없이 직접 그립니다)
+        :param color: 피벗 표시 색상 (기본값: 빨간색)
+        :param size: 피벗 표시 크기 (기본값: 5픽셀)
+        """
+        # 피벗 포인트 위치 계산
+        pivot_pos = self.pos
+        
+        # 카메라가 있으면 카메라 변환 적용
+        if camera:
+            pivot_pos = camera.real_pos_to_render_pos(pivot_pos)
+            
+        # 피벗 포인트에 십자가 그리기
+        pygame.draw.line(screen, color, 
+                        (pivot_pos.x - size, pivot_pos.y), 
+                        (pivot_pos.x + size, pivot_pos.y), 1)
+        pygame.draw.line(screen, color, 
+                        (pivot_pos.x, pivot_pos.y - size), 
+                        (pivot_pos.x, pivot_pos.y + size), 1)
 
 class Sprite:
     def __init__(self, image: pygame.Surface):
@@ -156,13 +170,26 @@ class ShapeSprite(Sprite):
 
     def _draw_shape(self):
         """Draw the selected shape onto the surface."""
-        if self.shape_type == 100:
+        if self.shape_type == CIRCLE:
             # Draw a circle (size.x is radius)
             pygame.draw.circle(self.image, self.color, (self.size.x // 2, self.size.y // 2), self.size.x // 2, self.thickness)
-        elif self.shape_type == 101:
+        elif self.shape_type == RECTANGLE:
             # Draw a rectangle (size.x is width, size.y is height)
             pygame.draw.rect(self.image, self.color, pygame.Rect(0, 0, self.size.x, self.size.y), self.thickness)
-        elif self.shape_type == 102:
+        elif self.shape_type == TRIANGLE:
+            # Draw a triangle (equilateral, centered)
+            points = [(self.size.x // 2, 0), (0, self.size.y), (self.size.x, self.size.y)]
+            pygame.draw.polygon(self.image, self.color, points, self.thickness)
+
+        # Dummy
+        if self.shape_type == ANTI_CIRCLE:
+            pygame.draw.circle(self.image, self.color, (self.size.x // 2, self.size.y // 2), self.size.x, self.thickness)
+            self.image = pygame.transform.smoothscale(self.image, (self.size.x//2,self.size.x//2))
+
+        elif self.shape_type == ANTI_RECTANGLE:
+            # Draw a rectangle (size.x is width, size.y is height)
+            pygame.draw.rect(self.image, self.color, pygame.Rect(0, 0, self.size.x, self.size.y), self.thickness)
+        elif self.shape_type == ANTI_TRIANGLE:
             # Draw a triangle (equilateral, centered)
             points = [(self.size.x // 2, 0), (0, self.size.y), (self.size.x, self.size.y)]
             pygame.draw.polygon(self.image, self.color, points, self.thickness)
@@ -215,12 +242,16 @@ class Scene:
 
     def draw_objects(self, screen: pygame.Surface):
         if self.camera_index != -1:
-            camera = self.objects[self.camera_index]
+            if isinstance(self.objects[self.camera_index], Camera):
+                camera = self.objects[self.camera_index]
+            else: raise TypeError("camera_index is not a Camera.")
             for obj in sorted(self.objects, key=lambda o: o.z_index):
                 if isinstance(obj, SpriteObject):
                     # 기본 위치와 모든 복제 위치에 대해 그리기
-                    for pos in obj.get_all_pivot_positions():
-                        render_pos = camera.real_pos_to_render_pos(pos)
+                    render_pos = camera.real_pos_to_render_pos(obj.get_pivot_pos())
+                    obj.sprite.draw(screen, render_pos)
+                    for copy in obj.objcopy_pos:
+                        render_pos = camera.real_pos_to_render_pos(obj.get_pivot_pos()+copy)
                         obj.sprite.draw(screen, render_pos)
 
     # 씬 내에서 오브젝트의 이름으로 찾기
@@ -247,6 +278,7 @@ class Game:
         self.event_handler = None
         self.loop_func = None
         self.is_running = False
+        self.fill_color: pygame.Color = COLOR_WHITE
 
     def add_scene(self, scene: Scene):
         # 씬을 리스트에 추가하고 이름-인덱스를 매핑
@@ -296,12 +328,13 @@ class Game:
             current_scene = self.get_current_scene()
             current_scene.update(dt)
 
+            # 렌더링
+            self.screen.fill(self.fill_color)
+            current_scene.draw_objects(self.screen)
+
             # 사용자 정의 루프 함수
             if self.loop_func:
-                self.loop_func()
+                self.loop_func(dt)
 
-            # 렌더링
-            self.screen.fill((0, 0, 0))
-            current_scene.draw_objects(self.screen)
-            pygame.display.flip()
+            pygame.display.update()
         pygame.quit()
