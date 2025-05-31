@@ -1,4 +1,4 @@
-# ---[ KawaraPGE v1.3.1 ]---
+# ---[ KawaraPGE v1.3.2 ]---
 # Kanowara Python Game Engine
 # Copyright (c) 2025, Sinoka Games. All rights reserved.
 # Created by Kanowara Sinoka (Kim Taeyang)
@@ -18,8 +18,9 @@ from typing import List
 from enum import Enum, auto
 
 import pygame.gfxdraw
-from . import util
-from .util import radius_to_vector2
+
+def radius_to_vector2(radius: int) -> pygame.Vector2:
+    return pygame.Vector2(radius*2, radius*2)
 
 from ..log4py.log4py import Logger
 
