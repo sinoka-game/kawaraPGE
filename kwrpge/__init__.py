@@ -1,4 +1,4 @@
-# ---[ KawaraPGE v1.3.2 ]---
+# ---[ KawaraPGE v1.4 ]---
 # Kanowara Python Game Engine
 # Copyright (c) 2025, Sinoka Games. All rights reserved.
 # Created by Kanowara Sinoka (Kim Taeyang)
@@ -145,10 +145,51 @@ class ObjectType:
 
 class Sprite:
     def __init__(self, image: pygame.Surface):
-        self.image = image
+        self.original_image = image  # 원본 보존
+        self.flip_x = False          # 좌우 반전 여부
+        self.flip_y = False          # 상하 반전 여부
+        self.scale = pygame.Vector2(1.0, 1.0)  # 비율 (x, y)
+        self.rotation = 0.0          # 회전각 (도 단위)
+        self.use_smoothscale = True  # True: 고품질, False: 속도 우선
+
+    def set_flip(self, x: bool, y: bool):
+        self.flip_x = x
+        self.flip_y = y
+
+    def set_scale(self, scale: pygame.Vector2):
+        self.scale = scale
+
+    def set_rotation(self, angle: float):
+        self.rotation = angle
+
+    def set_smooth(self, use_smooth: bool):
+        self.use_smoothscale = use_smooth
 
     def draw(self, screen: pygame.Surface, pos: pygame.Vector2):
-        screen.blit(self.image, pos)
+        image = self.original_image
+
+        # 반전
+        if self.flip_x or self.flip_y:
+            image = pygame.transform.flip(image, self.flip_x, self.flip_y)
+
+        # 크기 조절
+        new_size = (int(image.get_width() * self.scale.x),
+                    int(image.get_height() * self.scale.y))
+        if new_size[0] <= 0 or new_size[1] <= 0:
+            return  # 크기 비정상
+
+        if self.use_smoothscale:
+            image = pygame.transform.smoothscale(image, new_size)
+        else:
+            image = pygame.transform.scale(image, new_size)
+
+        # 회전 (주의: 회전은 크기 조절 이후에 해야 해상도 유지)
+        if self.rotation != 0:
+            image = pygame.transform.rotate(image, self.rotation)
+
+        # 화면에 그리기
+        screen.blit(image, pos)
+
 
 class ShapeSprite(Sprite):
     def __init__(self, shape_type: int, color: pygame.Color, size: pygame.Vector2, thickness: int = 0):
