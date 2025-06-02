@@ -1,4 +1,4 @@
-# ---[ KawaraPGE v1.4 ]---
+# ---[ KawaraPGE v1.5 ]---
 # Kanowara Python Game Engine
 # Copyright (c) 2025, Sinoka Games. All rights reserved.
 # Created by Kanowara Sinoka (Kim Taeyang)
@@ -10,14 +10,13 @@
 # and import it with the following command:
 # 
 # from kawaraPGE import kwrpge
-#
+# --- [v1.5 Update] ---
+# New: TileMap
 # --- [ All Code ] ---
 
 import pygame
 from typing import List
 from enum import Enum, auto
-
-import pygame.gfxdraw
 
 def radius_to_vector2(radius: int) -> pygame.Vector2:
     return pygame.Vector2(radius*2, radius*2)
@@ -190,6 +189,15 @@ class Sprite:
         # 화면에 그리기
         screen.blit(image, pos)
 
+class TileSet:
+    def __init__(self, tile_size: pygame.Vector2, *tile_sprites:Sprite):
+        self.tile_size = tile_size
+        if len(tile_sprites) == 1 and isinstance(tile_sprites[0], tuple):
+            self.tile_sprites = tile_sprites[0]
+        else:
+            self.tile_sprites = tile_sprites
+
+
 
 class ShapeSprite(Sprite):
     def __init__(self, shape_type: int, color: pygame.Color, size: pygame.Vector2, thickness: int = 0):
@@ -253,6 +261,44 @@ class Camera(ObjectType):
 
     def real_pos_to_render_pos(self, real_pos: pygame.Vector2):
         return real_pos - (self.pos - self.get_pivot_offset())
+    
+class TileMapObject(ObjectType):
+    def __init__(
+        self,
+        pos: pygame.Vector2,
+        name: str,
+        tile_set: TileSet,
+        tilemap: List[List[int]],
+        pivot: Pivot = Pivot.TOP_LEFT,
+        size: pygame.Vector2 = pygame.Vector2(800, 600),
+        z_index: int = 0,
+        objcopy_pos: List[pygame.Vector2] = None
+    ):
+        super().__init__(pos, name, pivot, size, z_index, objcopy_pos)
+        self.tile_set = tile_set
+        self.tilemap = tilemap  # 2D int list
+
+    def draw(self, screen: pygame.Surface, camera: Camera):
+        base_pos = self.get_pivot_pos()
+
+        # 복제 좌표를 포함한 모든 위치에 그리기
+        draw_positions = [pygame.Vector2(0, 0)] + self.objcopy_pos
+
+        for offset in draw_positions:
+            for row_idx, row in enumerate(self.tilemap):
+                for col_idx, tile_index in enumerate(row):
+                    if not (0 <= tile_index < len(self.tile_set.tile_sprites)):
+                        continue  # 잘못된 인덱스 무시
+
+                    sprite = self.tile_set.tile_sprites[tile_index]
+                    tile_pos = base_pos + offset + pygame.Vector2(
+                        col_idx * self.tile_set.tile_size.x, row_idx * self.tile_set.tile_size.y
+                    )
+
+                    if camera:
+                        tile_pos = camera.real_pos_to_render_pos(tile_pos)
+
+                    sprite.draw(screen, tile_pos)
 
 class Scene:
     def __init__(self, name: str):
@@ -295,6 +341,8 @@ class Scene:
                     for copy in obj.objcopy_pos:
                         render_pos = camera.real_pos_to_render_pos(obj.get_pivot_pos()+copy)
                         obj.sprite.draw(screen, render_pos)
+                elif isinstance(obj, TileMapObject):
+                    obj.draw(screen, self.get_camera())
 
     # 씬 내에서 오브젝트의 이름으로 찾기
     def get_object_by_name(self, name: str):
