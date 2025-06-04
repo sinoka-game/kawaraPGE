@@ -13,13 +13,11 @@
 # --- [v1.7 Update] ---
 # New: UI Sprite
 # Animation Sprite
-# Rotate Pivot
 # --- [ All Code ] ---
 
 import pygame
 from typing import List
 from enum import Enum, auto
-import math
 
 def radius_to_vector2(radius: int) -> pygame.Vector2:
     return pygame.Vector2(radius*2, radius*2)
@@ -158,94 +156,44 @@ class Sprite:
         self.scale = pygame.Vector2(1.0, 1.0)  # 비율 (x, y)
         self.rotation = 0.0          # 회전각 (도 단위)
         self.use_smoothscale = True  # True: 고품질, False: 속도 우선
-        # 피봇포인트 (0.5, 0.5)는 중앙, (0, 0)은 좌상단, (1, 1)은 우하단
-        self.pivot = pygame.Vector2(0.5, 0.5)
-    
+
     def set_flip(self, x: bool, y: bool):
         self.flip_x = x
         self.flip_y = y
-    
+
     def set_scale(self, scale: pygame.Vector2):
         self.scale = scale
-    
+
     def set_rotation(self, angle: float):
         self.rotation = angle
-    
+
     def set_smooth(self, use_smooth: bool):
         self.use_smoothscale = use_smooth
-    
-    def set_pivot(self, pivot: pygame.Vector2):
-        """피봇포인트 설정 (0.0~1.0 범위의 비율값)"""
-        self.pivot = pivot
-    
-    def set_pivot_xy(self, x: float, y: float):
-        """피봇포인트 설정 (x, y 각각 설정)"""
-        self.pivot = pygame.Vector2(x, y)
-    
+
     def draw(self, screen: pygame.Surface, pos: pygame.Vector2):
         image = self.original_image
-        
+
         # 반전
         if self.flip_x or self.flip_y:
             image = pygame.transform.flip(image, self.flip_x, self.flip_y)
-        
+
         # 크기 조절
         new_size = (int(image.get_width() * self.scale.x),
                     int(image.get_height() * self.scale.y))
         if new_size[0] <= 0 or new_size[1] <= 0:
             return  # 크기 비정상
-        
+
         if self.use_smoothscale:
             image = pygame.transform.smoothscale(image, new_size)
         else:
             image = pygame.transform.scale(image, new_size)
-        
-        # 회전 처리
-        if self.rotation != 0:
-            # 피봇포인트 계산 (스케일 적용된 이미지 기준)
-            pivot_x = image.get_width() * self.pivot.x
-            pivot_y = image.get_height() * self.pivot.y
-            
-            # 회전된 이미지와 새로운 사각형 얻기
-            rotated_image = pygame.transform.rotate(image, self.rotation)
-            rotated_rect = rotated_image.get_rect()
-            
-            # 원본 피봇포인트 위치 (회전 전)
-            original_pivot = pygame.Vector2(pivot_x, pivot_y)
-            
-            # 회전된 이미지에서 피봇포인트의 새 위치 계산
-            # 회전 중심은 원본 이미지의 중앙
-            image_center = pygame.Vector2(image.get_width() / 2, image.get_height() / 2)
-            
-            # 피봇포인트를 이미지 중심 기준으로 상대 위치 계산
-            relative_pivot = original_pivot - image_center
-            
-            # 회전 적용 (라디안 변환)
-            angle_rad = -math.radians(self.rotation)  # pygame은 시계방향이 양수
-            cos_a = math.cos(angle_rad)
-            sin_a = math.sin(angle_rad)
-            
-            rotated_pivot = pygame.Vector2(
-                relative_pivot.x * cos_a - relative_pivot.y * sin_a,
-                relative_pivot.x * sin_a + relative_pivot.y * cos_a
-            )
-            
-            # 회전된 이미지의 중심에서 다시 절대 위치로 변환
-            new_pivot = pygame.Vector2(rotated_rect.width / 2, rotated_rect.height / 2) + rotated_pivot
-            
-            # 그리기 위치 계산 (피봇포인트가 pos에 오도록)
-            draw_pos = pos - new_pivot
-            
-            screen.blit(rotated_image, draw_pos)
-        else:
-            # 회전이 없는 경우, 피봇포인트 기준으로 위치 조정
-            pivot_offset = pygame.Vector2(
-                image.get_width() * self.pivot.x,
-                image.get_height() * self.pivot.y
-            )
-            draw_pos = pos - pivot_offset
-            screen.blit(image, draw_pos)
 
+        # 회전 (주의: 회전은 크기 조절 이후에 해야 해상도 유지)
+        if self.rotation != 0:
+            image = pygame.transform.rotate(image, self.rotation)
+
+        # 화면에 그리기
+        screen.blit(image, pos)
 
 class AnimationSprite:
     def __init__(self, images: List[pygame.Surface]):
@@ -256,96 +204,47 @@ class AnimationSprite:
         self.scale = pygame.Vector2(1.0, 1.0)  # 비율 (x, y)
         self.rotation = 0.0          # 회전각 (도 단위)
         self.use_smoothscale = True  # True: 고품질, False: 속도 우선
-        # 피봇포인트 (0.5, 0.5)는 중앙, (0, 0)은 좌상단, (1, 1)은 우하단
-        self.pivot = pygame.Vector2(0.5, 0.5)
-    
+
     def set_flip(self, x: bool, y: bool):
         self.flip_x = x
         self.flip_y = y
-    
+
     def set_scale(self, scale: pygame.Vector2):
         self.scale = scale
-    
+
     def set_rotation(self, angle: float):
         self.rotation = angle
-    
+
     def set_smooth(self, use_smooth: bool):
         self.use_smoothscale = use_smooth
     
-    def set_pivot(self, pivot: pygame.Vector2):
-        """피봇포인트 설정 (0.0~1.0 범위의 비율값)"""
-        self.pivot = pivot
-    
-    def set_pivot_xy(self, x: float, y: float):
-        """피봇포인트 설정 (x, y 각각 설정)"""
-        self.pivot = pygame.Vector2(x, y)
-    
-    def next_img(self):
-        self.image_index = (self.image_index + 1) % len(self.images)
-    
+def next_img(self):
+    self.image_index = (self.image_index + 1) % len(self.images)
+
     def draw(self, screen: pygame.Surface, pos: pygame.Vector2):
         image = self.images[self.image_index]
-        
+
         # 반전
         if self.flip_x or self.flip_y:
             image = pygame.transform.flip(image, self.flip_x, self.flip_y)
-        
+
         # 크기 조절
         new_size = (int(image.get_width() * self.scale.x),
                     int(image.get_height() * self.scale.y))
         if new_size[0] <= 0 or new_size[1] <= 0:
             return  # 크기 비정상
-        
+
         if self.use_smoothscale:
             image = pygame.transform.smoothscale(image, new_size)
         else:
             image = pygame.transform.scale(image, new_size)
-        
-        # 회전 처리
+
+        # 회전 (주의: 회전은 크기 조절 이후에 해야 해상도 유지)
         if self.rotation != 0:
-            # 피봇포인트 계산 (스케일 적용된 이미지 기준)
-            pivot_x = image.get_width() * self.pivot.x
-            pivot_y = image.get_height() * self.pivot.y
-            
-            # 회전된 이미지와 새로운 사각형 얻기
-            rotated_image = pygame.transform.rotate(image, self.rotation)
-            rotated_rect = rotated_image.get_rect()
-            
-            # 원본 피봇포인트 위치 (회전 전)
-            original_pivot = pygame.Vector2(pivot_x, pivot_y)
-            
-            # 회전된 이미지에서 피봇포인트의 새 위치 계산
-            # 회전 중심은 원본 이미지의 중앙
-            image_center = pygame.Vector2(image.get_width() / 2, image.get_height() / 2)
-            
-            # 피봇포인트를 이미지 중심 기준으로 상대 위치 계산
-            relative_pivot = original_pivot - image_center
-            
-            # 회전 적용 (라디안 변환)
-            angle_rad = -math.radians(self.rotation)  # pygame은 시계방향이 양수
-            cos_a = math.cos(angle_rad)
-            sin_a = math.sin(angle_rad)
-            
-            rotated_pivot = pygame.Vector2(
-                relative_pivot.x * cos_a - relative_pivot.y * sin_a,
-                relative_pivot.x * sin_a + relative_pivot.y * cos_a
-            )
-            
-            # 회전된 이미지의 중심에서 다시 절대 위치로 변환
-            new_pivot = pygame.Vector2(rotated_rect.width / 2, rotated_rect.height / 2) + rotated_pivot
-            
-            # 그리기 위치 계산 (피봇포인트가 pos에 오도록)
-            draw_pos = pos - new_pivot
-            
-            screen.blit(rotated_image, draw_pos)
-        else:
-            # 회전이 없는 경우, 피봇포인트 기준으로 위치 조정
-            pivot_offset = pygame.Vector2(
-                image.get_width() * self.pivot.x,
-                image.get_height() * self.pivot.y
-            )
-            draw_pos = pos - pivot_offset
-            screen.blit(image, draw_pos)
+            image = pygame.transform.rotate(image, self.rotation)
+
+        # 화면에 그리기
+        screen.blit(image, pos)
 
 class AnimationSpriteObject(ObjectType):
     def __init__(self, pos: pygame.Vector2, fps: int, sprite: AnimationSprite, name: str = "Sprite", pivot: Pivot = Pivot.TOP_LEFT, 
