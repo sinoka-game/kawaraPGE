@@ -1,4 +1,4 @@
-# ---[ KawaraPGE v1.5 ]---
+# ---[ KawaraPGE v1.5.1 ]---
 # Kanowara Python Game Engine
 # Copyright (c) 2025, Sinoka Games. All rights reserved.
 # Created by Kanowara Sinoka (Kim Taeyang)
@@ -10,8 +10,8 @@
 # and import it with the following command:
 # 
 # from kawaraPGE import kwrpge
-# --- [v1.5 Update] ---
-# New: TileMap
+# --- [v1.5.1 Update] ---
+# New: Util Func
 # --- [ All Code ] ---
 
 import pygame
@@ -20,6 +20,11 @@ from enum import Enum, auto
 
 def radius_to_vector2(radius: int) -> pygame.Vector2:
     return pygame.Vector2(radius*2, radius*2)
+
+def generate_tilemap(tile_size: int, screen_width: int, screen_height: int, default_value=0):
+    columns = screen_width // tile_size
+    rows = screen_height // tile_size
+    return [[default_value for _ in range(columns)] for _ in range(rows)]
 
 from ..log4py.log4py import Logger
 
@@ -190,14 +195,24 @@ class Sprite:
         screen.blit(image, pos)
 
 class TileSet:
-    def __init__(self, tile_size: pygame.Vector2, *tile_sprites:Sprite):
+    def __init__(self, tile_size: pygame.Vector2, tile_sprites: tuple):
         self.tile_size = tile_size
-        if len(tile_sprites) == 1 and isinstance(tile_sprites[0], tuple):
-            self.tile_sprites = tile_sprites[0]
-        else:
-            self.tile_sprites = tile_sprites
+        self.tile_sprites = tile_sprites
 
+def split_image_to_sprites(image: pygame.Surface, tile_width: int, tile_height: int, resize: list = [1, 1], smooth = False) -> list[Sprite]:
+    sprites = []
+    image_width, image_height = image.get_width(), image.get_height()
 
+    for y in range(0, image_height, tile_height):
+        for x in range(0, image_width, tile_width):
+            rect = pygame.Rect(x, y, tile_width, tile_height)
+            tile_surface = image.subsurface(rect).copy()
+            sprite = Sprite(tile_surface)
+            sprite.set_scale(pygame.Vector2(resize[0], resize[1]))
+            sprite.set_smooth(smooth)
+            sprites.append(sprite)
+
+    return sprites
 
 class ShapeSprite(Sprite):
     def __init__(self, shape_type: int, color: pygame.Color, size: pygame.Vector2, thickness: int = 0):
@@ -248,15 +263,16 @@ class ShapeSprite(Sprite):
         """Draw the shape sprite to the screen at the given position."""
         super().draw(screen, pos)
 
+
 class SpriteObject(ObjectType):
     def __init__(self, pos: pygame.Vector2, sprite: Sprite, name: str = "Sprite", pivot: Pivot = Pivot.TOP_LEFT, 
                  size: pygame.Vector2 = pygame.Vector2(32, 32), objcopy_pos: List[pygame.Vector2] = None):
-        super().__init__(pos, name, pivot, size, 0, objcopy_pos)
+        super().__init__(pos, name, pivot, size, 1, objcopy_pos)
         self.sprite = sprite
 
 class Camera(ObjectType):
     def __init__(self, pos: pygame.Vector2 = pygame.Vector2(0, 0), name: str = "Camera", pivot: Pivot = Pivot.TOP_LEFT, 
-                 size: pygame.Vector2 = pygame.Vector2(800, 600)):
+                 size: pygame.Vector2 = pygame.Vector2(800, 640)):
         super().__init__(pos, name, pivot, size)
 
     def real_pos_to_render_pos(self, real_pos: pygame.Vector2):
@@ -270,7 +286,7 @@ class TileMapObject(ObjectType):
         tile_set: TileSet,
         tilemap: List[List[int]],
         pivot: Pivot = Pivot.TOP_LEFT,
-        size: pygame.Vector2 = pygame.Vector2(800, 600),
+        size: pygame.Vector2 = pygame.Vector2(800, 640),
         z_index: int = 0,
         objcopy_pos: List[pygame.Vector2] = None
     ):
@@ -357,7 +373,7 @@ class Scene:
 
 
 class Game:
-    def __init__(self, screen_size=(800, 600)):
+    def __init__(self, screen_size=(800, 640)):
         self.logger = Logger()
         pygame.init()
         self.scenes: list[Scene] = []
