@@ -1,4 +1,4 @@
-# ---[ KawaraPGE v1.5.1 ]---
+# ---[ KawaraPGE v1.6 ]---
 # Kanowara Python Game Engine
 # Copyright (c) 2025, Sinoka Games. All rights reserved.
 # Created by Kanowara Sinoka (Kim Taeyang)
@@ -10,8 +10,8 @@
 # and import it with the following command:
 # 
 # from kawaraPGE import kwrpge
-# --- [v1.5.1 Update] ---
-# New: Util Func
+# --- [v1.6 Update] ---
+# New: follow camera
 # --- [ All Code ] ---
 
 import pygame
@@ -277,6 +277,44 @@ class Camera(ObjectType):
 
     def real_pos_to_render_pos(self, real_pos: pygame.Vector2):
         return real_pos - (self.pos - self.get_pivot_offset())
+
+class FollowCamera(Camera):
+    def __init__(self, 
+                 target: ObjectType,
+                 min_bounds: pygame.Vector2, 
+                 max_bounds: pygame.Vector2,
+                 pos: pygame.Vector2 = pygame.Vector2(0, 0),
+                 name: str = "FollowCamera", 
+                 pivot: Pivot = Pivot.TOP_LEFT, 
+                 size: pygame.Vector2 = pygame.Vector2(800, 640),
+                 follow_speed: float = 0.1,
+                 target_anchor: pygame.Vector2 = None):
+        super().__init__(pos, name, pivot, size)
+        self.target = target
+        self.min_bounds = min_bounds
+        self.max_bounds = max_bounds
+        self.follow_speed = follow_speed
+
+        # 화면 내 타겟이 보이길 원하는 상대 위치 (기본: 화면 중앙)
+        self.target_anchor = target_anchor or (self.size / 2)
+
+    def update(self, dt: float):
+        if not self.target:
+            return
+
+        # 따라갈 목표 위치: 타겟 위치에서 anchor 위치를 뺀 값
+        desired_pos = self.target.pos - self.target_anchor
+
+        # 경계를 벗어나지 않게 조정
+        max_x = self.max_bounds.x - self.size.x
+        max_y = self.max_bounds.y - self.size.y
+        desired_pos.x = max(self.min_bounds.x, min(desired_pos.x, max_x))
+        desired_pos.y = max(self.min_bounds.y, min(desired_pos.y, max_y))
+
+        # 부드럽게 따라가기 (선형 보간)
+        self.pos += (desired_pos - self.pos) * self.follow_speed
+
+
     
 class TileMapObject(ObjectType):
     def __init__(
