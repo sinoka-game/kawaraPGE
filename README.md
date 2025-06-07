@@ -1,3 +1,4 @@
+English: `README-en.md`
 # kawaraPGE
 
 **kawaraPGE**는 Python으로 개발된 간단하고 가벼운 2D 게임 엔진입니다.  
